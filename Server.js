@@ -28,6 +28,5 @@ app.get("/", (req, res) => {
   res.send("API is running on Vercel...");
 });
 
-// Export the app for Vercel
-module.exports = app;
-module.exports.handler = serverless(app); // Vercel's serverless entry point
+// Export the serverless function
+module.exports = serverless(app);
