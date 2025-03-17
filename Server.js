@@ -6,6 +6,7 @@ const satelliteRoutes = require('./routes/satelliteRoutes');
 const stationRoutes = require('./routes/stationRoutes');
 const predictionRoutes = require('./routes/predictionRoutes');
 const authRoutes = require('./routes/authRoutes');
+const ServerlessHttp = require('serverless-http');
 
 
 const app = express();
@@ -33,7 +34,10 @@ app.get('/', (req, res) => {
 });
 
 // Start the server
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log('Server running on http://0.0.0.0:5000');
-});
+// const PORT = process.env.PORT || 5000;
+// app.listen(PORT, '0.0.0.0', () => {
+//   console.log('Server running on http://0.0.0.0:5000');
+// });
+// Export the app for Vercel
+module.exports = app;
+module.exports.handler = ServerlessHttp(app); // Vercel's serverless entry point

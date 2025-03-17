@@ -21,6 +21,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.9.4",
     "mongoose-sequence": "^6.0.1",
-    "satellite.js": "^5.0.0"
+    "satellite.js": "^5.0.0",
+    "serverless-http": "^3.2.0"
   }
 }
