@@ -10,6 +10,7 @@ const generateToken = (id) => {
 exports.register = async (req, res) => {
     const { name, email, password } = req.body;
 
+    console.log(req.body)
     try {
         const userExists = await User.findOne({ email });
 
@@ -18,7 +19,7 @@ exports.register = async (req, res) => {
         }
 
         const user = await User.create({ name, email, password });
-
+console.log(user)
         if (user) {
             res.status(201).json({
                 _id: user.id,
@@ -30,7 +31,7 @@ exports.register = async (req, res) => {
             res.status(400).json({ message: 'Invalid user data' });
         }
     } catch (err) {
-        res.status(500).json({ message: 'Server error', error: err.message });
+        res.status(503).json({ message: 'Database unavailable', error: err.message });
     }
 };
 
@@ -52,6 +53,6 @@ exports.login = async (req, res) => {
             res.status(401).json({ message: 'Invalid email or password' });
         }
     } catch (err) {
-        res.status(500).json({ message: 'Server error', error: err.message });
+        res.status(503).json({ message: 'Database unavailable', error: err.message });
     }
 };

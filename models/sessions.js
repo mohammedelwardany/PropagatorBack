@@ -1,24 +1,28 @@
 const mongoose = require('mongoose');
-const AutoIncrement = require('mongoose-sequence')(mongoose); // Import mongoose-sequence
 
-// Define the Sessions schema
-const SessionsScheme = new mongoose.Schema({
-  id: { type: Number, unique: true }, // Auto-increment field
-  startAtZero: String,
-  startAtMin: String,
-  endAtZero: String,
-  endAtMin: String,
-  maxElevation: String,
+// Define the Session schema (matches propagator output)
+const SessionSchema = new mongoose.Schema({
+  startTime: String,
+  endTime: String,
+  durationSeconds: Number,
+  startAzimuth: Number,
+  endAzimuth: Number,
+  maxElevation: Number,
+  maxElevationAzimuth: Number,
+  maxElevationTime: String,
+  startAtMinElevation: String,
+  endAtMinElevation: String,
+  orbitNumber: Number,
+  minRange: Number,
 });
-
-// Add auto-increment to the `id` field in the Sessions schema
-SessionsScheme.plugin(AutoIncrement, { inc_field: 'id' });
 
 // Define the SatelliteSession schema
-const SatelliteSessionScheme = new mongoose.Schema({
-  satId: String,
-  stationID: String,
-  Sessions: [SessionsScheme],
+const SatelliteSessionSchema = new mongoose.Schema({
+  satId: { type: String, required: true },
+  stationId: { type: String },
+  tleEpoch: String,
+  createdAt: { type: Date, default: Date.now },
+  sessions: [SessionSchema],
 });
 
-module.exports = mongoose.model('Sessions', SatelliteSessionScheme);
+module.exports = mongoose.model('Sessions', SatelliteSessionSchema);

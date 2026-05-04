@@ -18,7 +18,9 @@ exports.getAllStations = async (req, res) => {
     const stations = await Station.find();
     res.json(stations);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    // Return empty array instead of 500 if DB is down
+    console.warn('DB disconnected: Returning empty station list.');
+    res.json([]);
   }
 };
 
@@ -56,6 +58,6 @@ exports.deleteStation = async (req, res) => {
     if (!station) return res.status(404).json({ error: 'Station not found' });
     res.json({ message: 'Station deleted' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(503).json({ error: 'Database unavailable' });
   }
 };
