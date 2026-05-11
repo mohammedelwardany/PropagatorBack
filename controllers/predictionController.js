@@ -14,7 +14,6 @@ exports.predictCommunicationSessions = async (req, res) => {
     SatelliteId,
     StationId,
     TLE,
-    tleString,
     lat,
     long,
     altitude,
@@ -68,35 +67,10 @@ exports.predictCommunicationSessions = async (req, res) => {
 
     // Determine which TLE to use
     let tleLine1, tleLine2;
-    let providedTle = TLE || tleString;
 
-    // Handle case where frontend accidentally sends CSV instead of TLE
-    if (providedTle && providedTle.trim().startsWith('OBJECT_NAME')) {
-      const lines = providedTle.trim().split('\\n');
-      if (lines.length >= 2) {
-        const headers = lines[0].split(',');
-        const values = lines[1].split(',');
-        const noradIndex = headers.indexOf('NORAD_CAT_ID');
-        if (noradIndex !== -1 && values.length > noradIndex) {
-          const noradId = values[noradIndex].trim();
-          try {
-             const { tleUpdate } = require('../utills/tle_process');
-             providedTle = await tleUpdate(noradId);
-          } catch (e) {
-             console.error("Failed to fetch TLE from CSV ID:", e);
-             return res.status(400).json({ error: "Could not fetch TLE using NORAD ID from CSV." });
-          }
-        } else {
-          return res.status(400).json({ error: "Invalid CSV provided: missing NORAD_CAT_ID." });
-        }
-      } else {
-        return res.status(400).json({ error: "Invalid CSV provided: not enough lines." });
-      }
-    }
-
-    if (providedTle) {
+    if (TLE) {
       // User provided TLE directly
-      const splittedTle = tleSplit(providedTle);
+      const splittedTle = tleSplit(TLE);
       tleLine1 = splittedTle.tleLine1;
       tleLine2 = splittedTle.tleLine2;
     } else if (satelliteData && satelliteData.TLEs && satelliteData.TLEs.length > 0) {
