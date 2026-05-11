@@ -7,7 +7,19 @@ const axios = require('axios');
  */
 exports.tleUpdate = async (satId) => {
   try {
-    const url = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${satId}`;
+    // Try to fetch from Ivan's API first
+    const ivanUrl = `https://tle.ivanstanojevic.me/api/tle/${satId}`;
+    const ivanResponse = await axios.get(ivanUrl, { timeout: 15000 });
+    if (ivanResponse.data && ivanResponse.data.line1 && ivanResponse.data.line2) {
+      const name = ivanResponse.data.name ? ivanResponse.data.name.trim() : `SAT ${satId}`;
+      return `${name}\n${ivanResponse.data.line1}\n${ivanResponse.data.line2}`;
+    }
+  } catch (err) {
+    console.error(`Ivan API failed for ${satId}, falling back to CelesTrak:`, err.message);
+  }
+
+  try {
+    const url = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${satId}&FORMAT=TLE`;
     const response = await axios.get(url, { timeout: 15000 });
     const tleData = response.data;
 
@@ -18,6 +30,11 @@ exports.tleUpdate = async (satId) => {
     // CelesTrak sometimes returns "No GP data found" for invalid IDs
     if (tleData.includes('No GP data found') || tleData.includes('No TLE data')) {
       throw new Error(`No TLE data found for satellite ${satId}`);
+    }
+
+    // Handle unexpected CSV response instead of TLE
+    if (tleData.trim().startsWith('OBJECT_NAME')) {
+      throw new Error(`Received CSV format from CelesTrak instead of TLE for satellite ${satId}`);
     }
 
     return tleData;
