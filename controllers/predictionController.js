@@ -1,5 +1,5 @@
 const predictSessions = require("../utills/propagator_process");
-const { tleSplit, tleUpdate } = require("../utills/tle_process");
+const { tleSplit } = require("../utills/tle_process");
 const Satellite = require("../models/satellite");
 const Station = require("../models/station");
 const Sessions = require("../models/sessions");
@@ -13,6 +13,8 @@ exports.predictCommunicationSessions = async (req, res) => {
   const {
     SatelliteId,
     StationId,
+    TLE,
+    tleString,
     lat,
     long,
     altitude,
@@ -28,7 +30,8 @@ exports.predictCommunicationSessions = async (req, res) => {
     let satelliteData = null;
     let stationData = null;
 
-    if (SatelliteId) {
+    // Only look up satellite in DB if we need its TLE (i.e., no TLE provided directly)
+    if (SatelliteId && !TLE) {
       try {
         satelliteData = await Satellite.findOne({ satid: SatelliteId });
         if (!satelliteData) {
@@ -38,8 +41,11 @@ exports.predictCommunicationSessions = async (req, res) => {
             // Not a valid ObjectId, ignore
           }
         }
+        if (!satelliteData) {
+          return res.status(404).json({ error: "Satellite not found in database" });
+        }
       } catch (dbErr) {
-        console.warn("Database unavailable for satellite lookup.");
+        return res.status(503).json({ error: "Database unavailable. Provide TLE directly." });
       }
     }
 
@@ -62,24 +68,44 @@ exports.predictCommunicationSessions = async (req, res) => {
 
     // Determine which TLE to use
     let tleLine1, tleLine2;
+    let providedTle = TLE || tleString;
 
-    if (satelliteData && satelliteData.TLEs && satelliteData.TLEs.length > 0) {
+    // Handle case where frontend accidentally sends CSV instead of TLE
+    if (providedTle && providedTle.trim().startsWith('OBJECT_NAME')) {
+      const lines = providedTle.trim().split('\\n');
+      if (lines.length >= 2) {
+        const headers = lines[0].split(',');
+        const values = lines[1].split(',');
+        const noradIndex = headers.indexOf('NORAD_CAT_ID');
+        if (noradIndex !== -1 && values.length > noradIndex) {
+          const noradId = values[noradIndex].trim();
+          try {
+             const { tleUpdate } = require('../utills/tle_process');
+             providedTle = await tleUpdate(noradId);
+          } catch (e) {
+             console.error("Failed to fetch TLE from CSV ID:", e);
+             return res.status(400).json({ error: "Could not fetch TLE using NORAD ID from CSV." });
+          }
+        } else {
+          return res.status(400).json({ error: "Invalid CSV provided: missing NORAD_CAT_ID." });
+        }
+      } else {
+        return res.status(400).json({ error: "Invalid CSV provided: not enough lines." });
+      }
+    }
+
+    if (providedTle) {
+      // User provided TLE directly
+      const splittedTle = tleSplit(providedTle);
+      tleLine1 = splittedTle.tleLine1;
+      tleLine2 = splittedTle.tleLine2;
+    } else if (satelliteData && satelliteData.TLEs && satelliteData.TLEs.length > 0) {
       // Use the latest TLE from the database (TLEs are sorted by epoch descending)
       const latestTLE = satelliteData.TLEs[0];
       tleLine1 = latestTLE.tle_line1;
       tleLine2 = latestTLE.tle_line2;
-    } else if (SatelliteId) {
-      // Fallback: Fetch directly from API if DB data missing or DB unavailable
-      try {
-        const fetchedTLE = await tleUpdate(SatelliteId);
-        const splittedTle = tleSplit(fetchedTLE);
-        tleLine1 = splittedTle.tleLine1;
-        tleLine2 = splittedTle.tleLine2;
-      } catch (err) {
-        return res.status(400).json({ error: "Could not fetch TLE data for the given SatelliteId." });
-      }
     } else {
-      return res.status(400).json({ error: "No TLE data found in database and no SatelliteId provided." });
+      return res.status(400).json({ error: "No TLE data provided or found in database." });
     }
 
     if (!tleLine1 || !tleLine2) {
