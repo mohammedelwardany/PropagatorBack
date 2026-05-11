@@ -1,5 +1,5 @@
 const predictSessions = require("../utills/propagator_process");
-const { tleSplit } = require("../utills/tle_process");
+const { tleSplit, tleUpdate } = require("../utills/tle_process");
 const Satellite = require("../models/satellite");
 const Station = require("../models/station");
 const Sessions = require("../models/sessions");
@@ -13,7 +13,6 @@ exports.predictCommunicationSessions = async (req, res) => {
   const {
     SatelliteId,
     StationId,
-    TLE,
     lat,
     long,
     altitude,
@@ -29,8 +28,7 @@ exports.predictCommunicationSessions = async (req, res) => {
     let satelliteData = null;
     let stationData = null;
 
-    // Only look up satellite in DB if we need its TLE (i.e., no TLE provided directly)
-    if (SatelliteId && !TLE) {
+    if (SatelliteId) {
       try {
         satelliteData = await Satellite.findOne({ satid: SatelliteId });
         if (!satelliteData) {
@@ -40,11 +38,8 @@ exports.predictCommunicationSessions = async (req, res) => {
             // Not a valid ObjectId, ignore
           }
         }
-        if (!satelliteData) {
-          return res.status(404).json({ error: "Satellite not found in database" });
-        }
       } catch (dbErr) {
-        return res.status(503).json({ error: "Database unavailable. Provide TLE directly." });
+        console.warn("Database unavailable for satellite lookup.");
       }
     }
 
@@ -68,18 +63,23 @@ exports.predictCommunicationSessions = async (req, res) => {
     // Determine which TLE to use
     let tleLine1, tleLine2;
 
-    if (TLE) {
-      // User provided TLE directly
-      const splittedTle = tleSplit(TLE);
-      tleLine1 = splittedTle.tleLine1;
-      tleLine2 = splittedTle.tleLine2;
-    } else if (satelliteData && satelliteData.TLEs && satelliteData.TLEs.length > 0) {
+    if (satelliteData && satelliteData.TLEs && satelliteData.TLEs.length > 0) {
       // Use the latest TLE from the database (TLEs are sorted by epoch descending)
       const latestTLE = satelliteData.TLEs[0];
       tleLine1 = latestTLE.tle_line1;
       tleLine2 = latestTLE.tle_line2;
+    } else if (SatelliteId) {
+      // Fallback: Fetch directly from API if DB data missing or DB unavailable
+      try {
+        const fetchedTLE = await tleUpdate(SatelliteId);
+        const splittedTle = tleSplit(fetchedTLE);
+        tleLine1 = splittedTle.tleLine1;
+        tleLine2 = splittedTle.tleLine2;
+      } catch (err) {
+        return res.status(400).json({ error: "Could not fetch TLE data for the given SatelliteId." });
+      }
     } else {
-      return res.status(400).json({ error: "No TLE data provided or found in database." });
+      return res.status(400).json({ error: "No TLE data found in database and no SatelliteId provided." });
     }
 
     if (!tleLine1 || !tleLine2) {
